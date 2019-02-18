@@ -1,17 +1,17 @@
 import {Client, expect} from '@loopback/testlab';
 import {setupExpressApplication} from './test-helper';
-import * as http from 'http';
+import {ExpressServer} from '../../server';
 
 describe('PingController', () => {
+  let server: ExpressServer;
   let client: Client;
-  let server: http.Server;
 
   before('setupApplication', async () => {
     ({server, client} = await setupExpressApplication());
   });
 
   after('closes application', async () => {
-    server.close();
+    await server.stop();
   });
 
   it('invokes GET /ping', async () => {

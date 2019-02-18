@@ -1,4 +1,4 @@
-import {NoteApplication} from './note-application';
+import {NoteApplication} from './application';
 
 export async function migrate(args: string[]) {
   const existingSchema = args.includes('--rebuild') ? 'drop' : 'alter';

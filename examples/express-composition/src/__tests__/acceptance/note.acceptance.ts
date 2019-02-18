@@ -1,13 +1,13 @@
 import {Client, expect} from '@loopback/testlab';
 import {setupExpressApplication, givenNote} from './test-helper';
-import * as http from 'http';
-import {NoteApplication} from '../../note-application';
+import {NoteApplication} from '../../application';
 import {NoteRepository} from '../../repositories';
+import {ExpressServer} from '../../server';
 
 describe('NoteApplication', () => {
-  let lbApp: NoteApplication;
+  let server: ExpressServer;
   let client: Client;
-  let server: http.Server;
+  let lbApp: NoteApplication;
   let noteRepo: NoteRepository;
 
   before('setupApplication', async () => {
@@ -20,7 +20,7 @@ describe('NoteApplication', () => {
   });
 
   after('closes application', async () => {
-    server.close();
+    await server.stop();
   });
 
   it('creates a note', async function() {
@@ -46,8 +46,12 @@ describe('NoteApplication', () => {
     expect(response.body).to.not.be.empty();
   });
 
-  it('does not display static front page from Note app', async () => {
-    await client.get('/api/').expect(404);
+  it('displays static front page from Note app', async () => {
+    await client
+      .get('/api/')
+      .expect(200)
+      .expect('Content-Type', /text\/html/)
+      .expect(/<h1>express-composition/);
   });
 
   async function givenNoteRepository() {

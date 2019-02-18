@@ -202,69 +202,50 @@ $ lb4 controller
 Controller note was created in src/controllers/
 ```
 
-### Express Application
+### Express Class
 
-Rename **src/application.ts** to **src/note.application.ts** and create a new
-file **src/application.ts**. In the new file, create your Express class:
+Create a new file **src/server.ts** to create your Express class:
 
 ```sh
-npm i --save express
+npm install --save express
+npm install --save-dev @types/express
 ```
 
-{% include code-caption.html content="src/application.ts" %}
+{% include code-caption.html content="src/server.ts" %}
 
 ```ts
 import * as express from 'express';
 
 export class ExpressApplication {
-  app: express.Application;
-  constructor() {
+  constructor() {}
+}
+```
+
+Create two properties, the Express application instance and LoopBack application
+instance:
+
+```ts
+import {NoteApplication} from './application';
+import {ApplicationConfig} from '@loopback/core';
+import * as express from 'express';
+
+export class ExpressApplication {
+  private app: express.Application;
+  private lbApp: NoteApplication;
+
+  constructor(options: ApplicationConfig = {}) {
     this.app = express();
+    this.lbApp = new NoteApplication(options);
   }
 }
 ```
 
-For purposes of this tutorial, your class will have one property `app` which
-refers to an instance of `Express`.
-
-### Modifying the Routes
-
-Now we want our LoopBack REST API to be used with the base path `/api` as it'll
-be mounted on top of the Express application.
-
-We're going to modify `index.ts` to use the Express application. First, we're
-going to import the application:
-
-{% include code-caption.html content="src/index.ts" %}
+Now, inside the constructor, we're going to add the basepath and expose the
+front-end assets via Express:
 
 ```ts
-import {ExpressApplication} from './application';
-import {NoteApplication} from './note-application';
-import {ApplicationConfig} from '@loopback/core';
-
-export {ExpressApplication};
-
-export async function main(options: ApplicationConfig = {}) {
-  const express = new ExpressApplication();
-  const lbApp = new NoteApplication(options);
-
-  let app = express.app;
-}
-```
-
-Now, inside the `main` function, we're going to boot the `Note` application and
-add the basepath:
-
-```ts
-await lbApp.boot();
-lbApp.basePath('/api');
-```
-
-Then we're going to expose the front-end assets via Express:
-
-```ts
-// Expose the front-end assets via Express, not as LB4 route
-app.use(lbApp.requestHandler);
+this.lbApp.basePath('/api');
+this.app.use('/api', this.lbApp.requestHandler);
 ```
 
 Then, we can add some custom Express routes, as follows:
@@ -273,62 +254,93 @@ Then, we can add some custom Express routes, as follows:
 import {Request, Response} from 'express';
 import * as path from 'path';
 
-export async function main(options: ApplicationConfig = {}) {
+export class ExpressApplication {
+  private app: express.Application;
+  private lbApp: NoteApplication;
+
+  constructor(options: ApplicationConfig = {}) {
   // earlier code
 
   // Custom Express routes
-  app.get('/', function(_req: Request, res: Response) {
-    res.sendFile(path.resolve('public/index.html'));
+  this.app.get('/', function(_req: Request, res: Response) {
+    res.sendFile(path.resolve('public/express.html'));
   });
-  app.get('/hello', function(_req: Request, res: Response) {
+  this.app.get('/hello', function(_req: Request, res: Response) {
     res.send('Hello world!');
   });
 }
 ```
 
-Finally, we can add the code to start the Express application:
+Finally, we can add functions to boot the `Note` application and start the
+Express application:
 
 ```sh
-npm i --save p-event
+npm install --save p-event
 ```
 
 ```ts
 import * as pEvent from 'p-event';
 
-export async function main(options: ApplicationConfig = {}) {
-  // Start the Express application
-  const server = app.listen(3000);
-  await pEvent(server, 'listening');
-  console.log('Server is running at http://127.0.0.1:3000');
+export class ExpressApplication {
+  private app: express.Application;
+  private lbApp: NoteApplication;
 
-  return app;
+  constructor(options: ApplicationConfig = {}) {
+    //...
+  }
+
+  async boot() {
+    await this.lbApp.boot();
+  }
+
+  async start() {
+    const server = this.app.listen(3000);
+    await pEvent(server, 'listening');
+  }
 }
 ```
 
-[This](https://github.com/strongloop/loopback-next/blob/master/examples/express-composition/src/index.ts)
-is what your final `index.ts` file should look like.
+[This](https://github.com/strongloop/loopback-next/blob/master/examples/express-composition/src/server.ts)
+is what your final `server.ts` file should look like.
 
-Now let's start the application and visit <http://127.0.0.1:3000>:
+Then, we can modify our **src/index.ts** file to start the application:
+
+{% include code-caption.html content="src/index.ts" %}
+
+```ts
+import {ExpressServer} from './server';
+import {ApplicationConfig} from '@loopback/core';
+
+export {ExpressServer};
+
+export async function main(options: ApplicationConfig = {}) {
+  const server = new ExpressServer(options);
+  await server.boot();
+  await server.start();
+  console.log('Server is running at http://localhost:3000');
+}
+```
+
+Now let's start the application and visit <http://localhost:3000>:
 
 ```sh
 npm start
 
-Server is running at http://127.0.0.1:3000
+Server is running at http://localhost:3000
 ```
 
-If we go to the
-[Explorer](http://explorer.loopback.io/?url=http://127.0.0.1:3000/openapi.json),
-we can make requests for our LoopBack application. Notice how the server is
-<http://127.0.0.1:3000/api>.
+If we go to the [Explorer](http://localhost:3000/api/explorer), we can make
+requests for our LoopBack application. Notice how the server is
+<http://localhost:3000/api>.
 
-To view our custom `/hello` Express route, go to <http://127.0.0.1:3000/hello>
+To view our custom `/hello` Express route, go to <http://localhost:3000/hello>
 and you should see 'Hello world!'.
 
 As a bonus, you can add another custom Express route to a static file that will
 display your Notes in a table format:
 
 ```ts
-app.get('/notes', function(_req: Request, res: Response) {
+this.app.get('/notes', function(_req: Request, res: Response) {
   res.sendFile(path.resolve('public/notes.html'));
 });
 ```
@@ -336,7 +348,7 @@ app.get('/notes', function(_req: Request, res: Response) {
 And add the following
 [public/notes.html](https://github.com/strongloop/loopback-next/blob/master/examples/express-composition/public/notes.html)
 file to your project, run `npm start` again, and visit
-<http://127.0.0.1:3000/notes>.
+<http://localhost:3000/notes>.
 
 Congratulations, you just mounted LoopBack 4 REST API onto a simple Express
 application.
